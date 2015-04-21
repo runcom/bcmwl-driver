@@ -169,7 +169,11 @@ typedef irqreturn_t(*FN_ISR) (int irq, void *dev_id, struct pt_regs *ptregs);
 #define __devexit
 #endif
 #ifndef __devinit
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
+#define __devinit
+#else
 #define __devinit	__init
+#endif
 #endif
 #ifndef __devinitdata
 #define __devinitdata

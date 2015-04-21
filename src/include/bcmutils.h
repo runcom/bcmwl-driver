@@ -612,11 +612,14 @@ extern void printbig(char *buf);
 extern void prhex(const char *msg, uchar *buf, uint len);
 
 extern bcm_tlv_t *BCMROMFN(bcm_next_tlv)(bcm_tlv_t *elt, int *buflen);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 extern bcm_tlv_t *BCMROMFN(bcm_parse_tlvs)(void *buf, int buflen, uint key);
+#else
+extern bcm_tlv_t *BCMROMFN(bcm_parse_tlvs)(const void *buf, int buflen, uint key);
+#endif
 extern bcm_tlv_t *BCMROMFN(bcm_parse_ordered_tlvs)(void *buf, int buflen, uint key);
 
 extern const char *bcmerrorstr(int bcmerror);
-extern bcm_tlv_t *BCMROMFN(bcm_parse_tlvs)(void *buf, int buflen, uint key);
 
 typedef uint32 mbool;
 #define mboolset(mb, bit)		((mb) |= (bit))		

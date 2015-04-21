@@ -113,6 +113,12 @@ ifeq ($(APIFINAL),WEXT)
   $(info Using Wireless Extension API)
 endif
 
+ifeq ($(shell dpkg --print-architecture),amd64)
+BINARCH = x86_64
+else
+BINARCH = i386
+endif
+
 obj-m              += wl.o
 
 wl-objs            :=
@@ -126,7 +132,9 @@ EXTRA_CFLAGS       += -I$(src)/src/wl/sys -I$(src)/src/wl/phy -I$(src)/src/wl/pp
 EXTRA_CFLAGS       += -I$(src)/src/shared/bcmwifi/include
 #EXTRA_CFLAGS       += -DBCMDBG_ASSERT -DBCMDBG_ERR
 
-EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped
+EXTRA_CFLAGS       += -Wno-date-time
+
+EXTRA_LDFLAGS      := $(src)/lib/wlc_hybrid.o_shipped_$(BINARCH)
 
 KBASE              ?= /lib/modules/`uname -r`
 KBUILD_DIR         ?= $(KBASE)/build

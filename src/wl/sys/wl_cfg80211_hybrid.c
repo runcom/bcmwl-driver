@@ -63,8 +63,13 @@ static s32 wl_cfg80211_set_wiphy_params(struct wiphy *wiphy, u32 changed);
 static s32 wl_cfg80211_join_ibss(struct wiphy *wiphy, struct net_device *dev,
            struct cfg80211_ibss_params *params);
 static s32 wl_cfg80211_leave_ibss(struct wiphy *wiphy, struct net_device *dev);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0)
 static s32 wl_cfg80211_get_station(struct wiphy *wiphy,
            struct net_device *dev, u8 *mac, struct station_info *sinfo);
+#else
+static s32 wl_cfg80211_get_station(struct wiphy *wiphy,
+           struct net_device *dev, const u8 *mac, struct station_info *sinfo);
+#endif
 static s32 wl_cfg80211_set_power_mgmt(struct wiphy *wiphy,
            struct net_device *dev, bool enabled, s32 timeout);
 static int wl_cfg80211_connect(struct wiphy *wiphy, struct net_device *dev,
@@ -76,8 +81,14 @@ static s32
 wl_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
                          enum nl80211_tx_power_setting type, s32 dbm);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 static s32 wl_cfg80211_set_tx_power(struct wiphy *wiphy,
            enum nl80211_tx_power_setting type, s32 dbm);
+#else
+static int wl_cfg80211_set_tx_power(struct wiphy *wiphy,
+		struct wireless_dev *wdev,
+		enum nl80211_tx_power_setting type, int dbm);
+#endif /* 3.8 */
 #else
 static s32 wl_cfg80211_set_tx_power(struct wiphy *wiphy,
            enum tx_power_setting type, s32 dbm);
@@ -1086,8 +1097,14 @@ static s32
 wl_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
                          enum nl80211_tx_power_setting type, s32 dbm)
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 static s32
 wl_cfg80211_set_tx_power(struct wiphy *wiphy, enum nl80211_tx_power_setting type, s32 dbm)
+#else
+static int
+wl_cfg80211_set_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev,
+		enum nl80211_tx_power_setting type, int dbm)
+#endif /* 3.8 */
 #else
 #define NL80211_TX_POWER_AUTOMATIC TX_POWER_AUTOMATIC
 #define NL80211_TX_POWER_LIMITED TX_POWER_LIMITED
@@ -1138,12 +1155,16 @@ wl_cfg80211_set_tx_power(struct wiphy *wiphy, enum tx_power_setting type, s32 db
 		return err;
 	}
 	wl->conf->tx_power = dbm;
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 	return err;
+#else
+	return (int) err;
+#endif
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
-static s32 wl_cfg80211_get_tx_power(struct wiphy *wiphy, struct wireless_dev *wdev, s32 *dbm)
+static int wl_cfg80211_get_tx_power(struct wiphy *wiphy,
+		struct wireless_dev *wdev, int *dbm)
 #else
 static s32 wl_cfg80211_get_tx_power(struct wiphy *wiphy, s32 *dbm)
 #endif
@@ -1152,7 +1173,11 @@ static s32 wl_cfg80211_get_tx_power(struct wiphy *wiphy, s32 *dbm)
 	struct net_device *ndev = wl_to_ndev(wl);
 	s32 txpwrdbm;
 	u8 result;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 	s32 err = 0;
+#else
+	int err = 0;
+#endif
 
 	err = wl_dev_intvar_get(ndev, "qtxpower", &txpwrdbm);
 	if (err) {
@@ -1160,7 +1185,11 @@ static s32 wl_cfg80211_get_tx_power(struct wiphy *wiphy, s32 *dbm)
 		return err;
 	}
 	result = (u8) (txpwrdbm & ~WL_TXPWR_OVERRIDE);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 	*dbm = (s32) bcm_qdbm_to_mw(result);
+#else
+	*dbm = (int) bcm_qdbm_to_mw(result);
+#endif
 
 	return err;
 }
@@ -1387,7 +1416,7 @@ wl_cfg80211_get_key(struct wiphy *wiphy, struct net_device *dev,
 	key_endian_to_host(&key);
 
 	params.key_len = (u8) min_t(u8, DOT11_MAX_KEY_SIZE, key.len);
-	memcpy(params.key, key.data, params.key_len);
+	memcpy((char *)params.key, key.data, params.key_len);
 
 	if ((err = wl_dev_ioctl(dev, WLC_GET_WSEC, &wsec, sizeof(wsec)))) {
 		return err;
@@ -1421,9 +1450,15 @@ wl_cfg80211_get_key(struct wiphy *wiphy, struct net_device *dev,
 	return err;
 }
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 16, 0)
 static s32
 wl_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
                         u8 *mac, struct station_info *sinfo)
+#else
+static s32
+wl_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
+                        const u8 *mac, struct station_info *sinfo)
+#endif
 {
 	struct wl_cfg80211_priv *wl = wiphy_to_wl(wiphy);
 	scb_val_t scb_val;
@@ -1441,7 +1476,11 @@ wl_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
 		WL_DBG(("Could not get rate (%d)\n", err));
 	} else {
 		rate = dtoh32(rate);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)
 		sinfo->filled |= STATION_INFO_TX_BITRATE;
+#else
+		sinfo->filled |= BIT(NL80211_STA_INFO_TX_BITRATE);
+#endif
 		sinfo->txrate.legacy = rate * 5;
 		WL_DBG(("Rate %d Mbps\n", (rate / 2)));
 	}
@@ -1454,7 +1493,11 @@ wl_cfg80211_get_station(struct wiphy *wiphy, struct net_device *dev,
 			return err;
 		}
 		rssi = dtoh32(scb_val.val);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 0, 0)
 		sinfo->filled |= STATION_INFO_SIGNAL;
+#else
+		sinfo->filled |= BIT(NL80211_STA_INFO_SIGNAL);
+#endif
 		sinfo->signal = rssi;
 		WL_DBG(("RSSI %d dBm\n", rssi));
 	}
@@ -2010,9 +2053,15 @@ static s32 wl_inform_single_bss(struct wl_cfg80211_priv *wl, struct wl_bss_info 
 
 	notify_ie = (u8 *)bi + le16_to_cpu(bi->ie_offset);
 	notify_ielen = le32_to_cpu(bi->ie_length);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 18, 0)
 	cbss = cfg80211_inform_bss(wiphy, channel, (const u8 *)(bi->BSSID.octet),
 		0, beacon_proberesp->capab_info, beacon_proberesp->beacon_int,
 		(const u8 *)notify_ie, notify_ielen, signal, GFP_KERNEL);
+#else
+	cbss = cfg80211_inform_bss(wiphy, channel, CFG80211_BSS_FTYPE_UNKNOWN, (const u8 *)(bi->BSSID.octet),
+		0, beacon_proberesp->capab_info, beacon_proberesp->beacon_int,
+		(const u8 *)notify_ie, notify_ielen, signal, GFP_KERNEL);
+#endif
 
 	if (unlikely(!cbss))
 		return -ENOMEM;
@@ -2071,7 +2120,26 @@ wl_notify_connect_status(struct wl_cfg80211_priv *wl, struct net_device *ndev,
 			wl_get_assoc_ies(wl);
 			memcpy(&wl->bssid, &e->addr, ETHER_ADDR_LEN);
 			wl_update_bss_info(wl);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)
+			{
+				struct wl_bss_info *bi;
+				u16 bss_info_channel;
+				struct ieee80211_channel *channel;
+				u32 freq;
+
+				bi = (struct wl_bss_info *)(wl->extra_buf + 4);
+				bss_info_channel = bi->ctl_ch ? bi->ctl_ch : CHSPEC_CHANNEL(bi->chanspec);
+
+				freq = ieee80211_channel_to_frequency(bss_info_channel,
+					(bss_info_channel <= CH_MAX_2G_CHANNEL) ?
+					IEEE80211_BAND_2GHZ : IEEE80211_BAND_5GHZ);
+
+				channel = ieee80211_get_channel(wl_to_wiphy(wl), freq);
+				cfg80211_ibss_joined(ndev, (u8 *)&wl->bssid, channel, GFP_KERNEL);
+			}
+#else
 			cfg80211_ibss_joined(ndev, (u8 *)&wl->bssid, GFP_KERNEL);
+#endif
 			set_bit(WL_STATUS_CONNECTED, &wl->status);
 			wl->profile->active = true;
 		}
@@ -2238,9 +2306,9 @@ static s32 wl_update_bss_info(struct wl_cfg80211_priv *wl)
 	struct wlc_ssid *ssid;
 	struct bcm_tlv *tim;
 	s32 dtim_period;
+	s32 err = 0;
 	size_t ie_len;
 	u8 *ie;
-	s32 err = 0;
 
 	ssid = &wl->profile->ssid;
 	bss = cfg80211_get_bss(wl_to_wiphy(wl), NULL, (s8 *)&wl->bssid,

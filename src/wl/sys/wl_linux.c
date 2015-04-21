@@ -111,6 +111,10 @@ static void wl_dpc_rxwork(struct wl_task *task);
 
 static int wl_reg_proc_entry(wl_info_t *wl);
 
+#ifndef init_MUTEX
+#define init_MUTEX(sem) sema_init(sem, 1)
+#endif
+
 static int wl_linux_watchdog(void *ctx);
 static
 int wl_found = 0;
@@ -155,6 +159,8 @@ static void wl_uninit_rfkill(wl_info_t *wl);
 static int wl_set_radio_block(void *data, bool blocked);
 static void wl_report_radio_state(wl_info_t *wl);
 #endif
+
+MODULE_LICENSE("MIXED/Proprietary");
 
 static struct pci_device_id wl_id_table[] =
 {
@@ -215,7 +221,7 @@ module_param(nompc, int, 0);
 #define to_str(s) #s
 #define quote_str(s) to_str(s)
 
-#define BRCM_WLAN_IFNAME eth%d
+#define BRCM_WLAN_IFNAME wlan%d
 
 static char intf_name[IFNAMSIZ] = quote_str(BRCM_WLAN_IFNAME);
 
@@ -878,7 +884,11 @@ wl_remove(struct pci_dev *pdev)
 static SIMPLE_DEV_PM_OPS(wl_pm_ops, wl_suspend, wl_resume);
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 8, 0)
 static struct pci_driver wl_pci_driver = {
+#else
+static struct pci_driver wl_pci_driver __refdata = {
+#endif
 	.name =		"wl",
 	.probe =	wl_pci_probe,
 	.remove =	__devexit_p(wl_remove),
@@ -1307,7 +1317,12 @@ wl_alloc_linux_if(wl_if_t *wlif)
 	dev->priv = priv_link;
 #else
 
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 17, 0))
 	dev = alloc_netdev(sizeof(priv_link_t), intf_name, ether_setup);
+#else
+	dev = alloc_netdev(sizeof(priv_link_t), intf_name, NET_NAME_UNKNOWN,
+			   ether_setup);
+#endif
 	if (!dev) {
 		WL_ERROR(("wl%d: %s: alloc_netdev failed\n",
 			(wl->pub)?wl->pub->unit:wlif->subunit, __FUNCTION__));
