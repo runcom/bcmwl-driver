@@ -2096,7 +2096,7 @@ wl_notify_connect_status(struct wl_cfg80211_priv *wl, struct net_device *ndev,
 		}
 		else if ((event == WLC_E_LINK && ~(flags & WLC_EVENT_MSG_LINK)) ||
 			event == WLC_E_DEAUTH_IND || event == WLC_E_DISASSOC_IND) {
-			cfg80211_disconnected(ndev, 0, NULL, 0, GFP_KERNEL);
+			cfg80211_disconnected(ndev, 0, NULL, 0, true, GFP_KERNEL);
 			clear_bit(WL_STATUS_CONNECTED, &wl->status);
 			wl_link_down(wl);
 			wl_init_prof(wl->profile);
